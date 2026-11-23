@@ -1,53 +1,55 @@
-# NLP Lab: tokens y predicción
+# NLP Lab · Tokens y predicción
 
-Aplicación educativa con Streamlit basada en el notebook **Encuentro 3 · Representación de texto y selección de modelos**. Introduce una frase en español y observa sus **tokens** y la **predicción de sentimientos (1–5 estrellas)**.
+Aplicación educativa basada en el notebook **Encuentro 3: Representación de texto y selección de modelos**.
 
-## ¿Qué parte del notebook se utiliza?
+El usuario introduce **una sola frase** y obtiene:
 
-| Notebook | `nlp_lab_frase_streamlit` | Para qué sirve |
+1. La etiqueta de sentimiento (1 a 5 estrellas) y su puntuación.
+2. **Un gráfico con las puntuaciones de las cinco estrellas** y una tabla numérica.
+3. Los **tokens reales e IDs** del tokenizador del clasificador.
+4. Una comparación opcional de la tokenización de spaCy.
+5. Una explicación integrada de **tokenización vs. predicción**, paso por paso.
+
+> El modelo `nlptown/bert-base-multilingual-uncased-sentiment` fue ajustado con reseñas de productos. Sus puntuaciones son las salidas de la clasificación entre estrellas; **no son precisión o certeza calibrada**. El modelo no clasifica motivos de solicitudes de estudiantes.
+
+## Relación con el notebook
+
+| Notebook | Archivo de la aplicación | Función |
 |---|---|---|
-| Celdas 8–9 (`nlp`, `doc`, `t.text`, `t.lemma_`) | `cargar_spacy()` y `analizar_frase()` | Mostrar los tokens lingüísticos de spaCy |
-| Celdas 20–22 (`AutoTokenizer` de BETO) | No se carga BETO | Son experimentos de tokenización, **no** el modelo que predice el sentimiento |
-| Celda 28 (`pipeline(...sentiment)`) | `cargar_clasificador()` | Cargar el modelo preentrenado que asigna estrellas |
-| Celda 31 (`cadena()`) | `analizar_frase()` | Encadenar texto → tokens → predicción |
-| Celdas 14–18 y 25 (BoW, embeddings) | Excluidas | No son necesarias para una frase y su predicción |
+| Celdas 8–9 · spaCy | `nlp_core.py` | Tokens, lemas, stop words y puntuación |
+| Celdas 20–22 · BETO | Excluido | Experimento aparte, otro tokenizador |
+| Celda 28 · Hugging Face | `app.py`, `nlp_core.py` | Carga y predicción con el modelo de sentimiento |
+| Celda 31 · `cadena()` | `nlp_core.py` | Integración de análisis y predicción |
 
-**Importante:** la app muestra los tokens del tokenizador que **sí recibe el modelo de sentimientos**: `clasificador.tokenizer`. Es diferente al tokenizador BETO utilizado para el ejercicio didáctico. Por ello, se presentan dos vistas: tokens del clasificador y tokens de spaCy. No se eliminan negaciones ni palabras vacías antes de predecir.
+Para obtener las cinco puntuaciones, ahora se utiliza `top_k=None` en la llamada al clasificador. Solo se muestra la predicción de mayor puntuación como etiqueta ganadora.
 
-## Estructura para GitHub
+## Estructura del repositorio
 
 ```text
 nlp-lab-streamlit/
-├── app.py                  # Interfaz: recibe frase y muestra resultados
-├── nlp_core.py             # Procesamiento e inferencia de NLP
-├── requirements.txt        # Paquetes y modelo spaCy
-├── README.md               # Esta guía
+├── app.py
+├── nlp_core.py
+├── requirements.txt
+├── README.md
+├── tests/
+│   └── test_nlp_core.py
 ├── .gitignore
 └── .streamlit/
-    └── config.toml         # Tema visual
+    └── config.toml
 ```
 
-En GitHub no es necesario subir los pesos del modelo de Hugging Face ni el notebook para que funcione la aplicación. El notebook se puede adjuntar como recurso pedagógico opcional.
+## Publicar en Streamlit Community Cloud
 
-## Publicar directamente con GitHub y Streamlit Community Cloud
+1. Sube el contenido de la carpeta (no el ZIP) a la **raíz** del repositorio GitHub.
+2. Abre <https://share.streamlit.io/> y vincula el repositorio.
+3. Selecciona la rama `main`, archivo principal `app.py` y Python **3.12** en *Advanced settings*.
+4. Publica la aplicación. `requirements.txt` define la versión de Streamlit y el resto de bibliotecas.
+5. La primera consulta descarga el modelo de Hugging Face (requiere acceso a Internet); pueden darse límites de memoria o problemas de conexión en la instancia.
 
-1. Crea o abre tu repositorio `nlp-lab-streamlit` en GitHub.
-2. Sube **los archivos descomprimidos** a la raíz del repositorio; no subas solo el ZIP.
-3. En <https://share.streamlit.io/> selecciona crear aplicación desde GitHub.
-4. Selecciona tu repositorio, rama `main` y archivo principal `app.py`.
-5. En **Advanced settings** elige **Python 3.12**.
-6. Haz clic en **Deploy**. El servicio instalará las dependencias de `requirements.txt` y descargará el modelo de Hugging Face en su primera ejecución.
+## Verificar la lógica (sin descargar modelos)
 
-Se fija **Streamlit 1.67.0** en `requirements.txt`. No es necesario indicar la versión en la interfaz de despliegue.
+```bash
+python -m unittest discover -s tests -v
+```
 
-**Nota sobre límites:** el modelo de sentimientos es BERT multilingüe y consume más recursos que un ejemplo de Streamlit sin IA. La primera inferencia descargará archivos relativamente grandes; si la instancia se queda sin RAM o falla la conexión a Hugging Face, los logs de Streamlit indicarán el error. La ejecución con todos los modelos no fue verificada dentro de un servidor Community Cloud.
-
-## Ejemplo de uso
-
-Escribe `No me gustó la clase de hoy` y presiona **Mostrar tokens y predicción**. Verás:
-
-- Tokens del modelo Transformer, con sus IDs.
-- Tokens y lemas identificados por spaCy.
-- Etiqueta `1 star`, `2 stars`…`5 stars` según lo que el modelo produzca, y su puntuación.
-
-La predicción puede variar según la versión y el modelo y **no** se debe confundir la puntuación con exactitud real. Este modelo fue entrenado sobre reseñas de productos, no sobre solicitudes de estudiantes.
+Las pruebas utilizan sustitutos del modelo real para comprobar los resultados, las cinco puntuaciones, el truncamiento y la conservación de negaciones. **No sustituyen una prueba completa en Streamlit Community Cloud.**
