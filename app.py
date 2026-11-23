@@ -1,10 +1,10 @@
-"""Interfaz web para el laboratorio: una frase, sus tokens y una predicción.
+"""Interfaz de NLP Lab: escribir frase → tokens → cinco puntuaciones.
 
-Streamlit Community Cloud ejecuta `app.py` desde el repositorio GitHub.
-No es necesario subir el modelo a GitHub: Hugging Face lo descarga al
-inicializarlo por primera vez (se requiere acceso a Internet).
+Para desplegar: subir este repositorio a GitHub y seleccionar `app.py`
+como archivo principal en Streamlit Community Cloud.
 """
 
+import pandas as pd
 import streamlit as st
 
 from nlp_core import analizar_frase
@@ -13,7 +13,11 @@ from nlp_core import analizar_frase
 MODELO_SENTIMIENTO = "nlptown/bert-base-multilingual-uncased-sentiment"
 MAX_TOKENS = 128
 
-st.set_page_config(page_title="NLP Lab · Tokens y predicción", page_icon="🔤", layout="centered")
+st.set_page_config(
+    page_title="NLP Lab · Tokens y predicción",
+    page_icon="🔤",
+    layout="centered",
+)
 
 
 @st.cache_resource(show_spinner="Cargando spaCy en español...")
@@ -28,7 +32,7 @@ def cargar_clasificador():
     import torch
     from transformers import pipeline
 
-    # Comunidad Streamlit: usamos solo CPU y reutilizamos el mismo modelo.
+    # CPU: compatible con las instancias gratuitas de Community Cloud.
     torch.set_num_threads(2)
     return pipeline(
         task="text-classification",
@@ -39,9 +43,9 @@ def cargar_clasificador():
 
 st.title("NLP Lab: de una frase a una predicción")
 st.write(
-    "Escribe una frase. La app la dividirá en tokens con spaCy y mostrará "
-    "los tokens que utiliza el clasificador de Hugging Face para predecir "
-    "una calificación de **1 a 5 estrellas**."
+    "Explora cómo una frase se convierte en **tokens**, cómo esos tokens "
+    "se representan con **identificadores numéricos** y cómo un modelo "
+    "Transformer produce **cinco puntuaciones de sentimiento**."
 )
 
 with st.form("formulario_frase"):
@@ -50,7 +54,7 @@ with st.form("formulario_frase"):
         value="No me gustó la clase de hoy",
         max_chars=4000,
         height=110,
-        help="Escribe una frase en español; el texto se enviará al modelo sin quitar negaciones.",
+        help="El texto se analiza tal como lo escribes: no eliminamos negaciones.",
     )
     analizar = st.form_submit_button("Mostrar tokens y predicción", type="primary")
 
@@ -64,7 +68,7 @@ if analizar:
                 clasificador = cargar_clasificador()
                 salida = analizar_frase(frase, nlp, clasificador, MAX_TOKENS)
         except Exception as exc:
-            st.error("El análisis no pudo completarse. Revisa los logs del despliegue y las dependencias.")
+            st.error("El análisis no pudo completarse. Revisa los logs del despliegue.")
             with st.expander("Detalle técnico del error"):
                 st.exception(exc)
         else:
@@ -72,40 +76,96 @@ if analizar:
             st.subheader("1. Predicción del modelo")
             col1, col2 = st.columns(2)
             col1.metric("Etiqueta predicha", salida["etiqueta"])
-            col2.metric("Puntuación de la etiqueta", f'{salida["puntuacion"]:.1%}')
+            col2.metric("Puntuación de esa etiqueta", f'{salida["puntuacion"]:.1%}')
+
+            st.markdown("#### Puntuación de las cinco etiquetas")
+            puntajes = pd.DataFrame(
+                [
+                    {
+                        "Estrellas": f'{fila["estrellas"]} ★',
+                        "Puntuación (%)": round(fila["puntuacion"] * 100, 2),
+                    }
+                    for fila in salida["distribucion"]
+                ]
+            )
+            st.bar_chart(
+                puntajes.set_index("Estrellas"),
+                y="Puntuación (%)",
+                horizontal=True,
+            )
+            with st.expander("Ver las cinco puntuaciones exactas"):
+                st.dataframe(puntajes, hide_index=True, width="stretch")
             st.caption(
-                "El modelo está ajustado con reseñas de productos: predice 1–5 estrellas. "
-                "Su puntuación no garantiza una interpretación correcta de una frase educativa."
+                "Estas cinco puntuaciones suman aproximadamente 100 % (salvo redondeo). "
+                "El modelo elige la categoría con la mayor puntuación. "
+                "No son porcentajes de positividad ni una garantía de acierto."
+            )
+            st.info(
+                "El clasificador fue ajustado con reseñas de productos y devuelve 1–5 estrellas. "
+                "Una frase educativa no es necesariamente una reseña; interpreta con cautela "
+                "las estrellas y sus puntuaciones."
             )
 
-            st.subheader("2. Tokens utilizados por el clasificador")
+            st.subheader("2. Tokens realmente utilizados por el clasificador")
             st.write([fila["Token del modelo"] for fila in salida["tokens_modelo"]])
             st.dataframe(
                 salida["tokens_modelo"],
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
             )
             st.caption(
-                f'Tokens realmente enviados al modelo (incluidos especiales): {salida["total_modelo"]}. '
-                f'Tokens antes del truncamiento: {salida["total_original_modelo"]}.'
+                f'Tokens enviados al modelo (incluidos los especiales): {salida["total_modelo"]}. '
+                f'Tokens sin truncar: {salida["total_original_modelo"]}.'
             )
             if salida["truncado"]:
                 st.warning(
-                    f'La frase supera {MAX_TOKENS} tokens. El modelo recibió solo los primeros '
-                    "tokens, respetando sus tokens especiales."
+                    f'La frase superó el límite de {MAX_TOKENS} tokens. '
+                    "El clasificador recibió la versión truncada del texto."
                 )
 
-            with st.expander("3. Comparar con la tokenización de spaCy (notebook)"):
+            with st.expander("3. Comparación con spaCy (notebook)"):
                 st.write([fila["Token"] for fila in salida["tokens_spacy"]])
-                st.dataframe(salida["tokens_spacy"], hide_index=True, use_container_width=True)
-                st.caption(
-                    "spaCy separa palabras y puntuación; el modelo Transformer maneja "
-                    "subpalabras e IDs. Son dos representaciones distintas."
+                st.dataframe(
+                    salida["tokens_spacy"],
+                    hide_index=True,
+                    width="stretch",
                 )
+                st.caption(
+                    "spaCy divide palabras y puntuación y calcula lemas. "
+                    "Sus tokens no se envían al clasificador de sentimientos."
+                )
+
+            st.subheader("4. ¿Qué diferencia hay entre tokenización y predicción?")
+            st.markdown(
+                "**Tokenización:** convierte una frase en unidades pequeñas "
+                "(palabras o subpalabras). Por ejemplo, `gusta` puede dividirse "
+                "en `gus` y `##ta`. Cada token tiene un ID dentro del vocabulario. "
+                "**La tokenización no determina el sentimiento.**"
+            )
+            st.markdown(
+                "**Predicción:** el modelo convierte los IDs en *embeddings*, "
+                "calcula representaciones contextualizadas con capas Transformer "
+                "y obtiene una puntuación para cada una de sus cinco etiquetas. "
+                "La etiqueta con mayor puntuación es la respuesta mostrada."
+            )
+            st.code(
+                "Frase original\n"
+                "    ↓\n"
+                "Tokenizador del clasificador → tokens + IDs\n"
+                "    ↓\n"
+                "Embeddings + Transformer\n"
+                "    ↓\n"
+                "Cinco puntuaciones → etiqueta con mayor puntuación",
+                language="text",
+            )
+            st.caption(
+                "Relación con el notebook: spaCy (celdas 8–9); "
+                "clasificación Hugging Face (celda 28); integración (celda 31). "
+                "El tokenizador BETO de las celdas 20–22 es un experimento distinto."
+            )
 
 st.divider()
 st.caption(
     "Basado en Encuentro 3 · Representación de texto y selección de modelos. "
-    "El tokenizador BETO del notebook es un experimento aparte: aquí se "
-    "visualizan los tokens del modelo que realmente predice las estrellas."
+    "No se entrena un modelo nuevo: se utiliza uno preentrenado de Hugging Face."
 )
