@@ -1,49 +1,55 @@
-# NLP Lab · Frontend azul pizarra
+# NLP Lab · Tokens y predicción
 
-Aplicación didáctica de **procesamiento de lenguaje natural** con Streamlit. El diseño sigue exactamente la paleta de seis colores compartida en la referencia:
+Aplicación educativa basada en el notebook **Encuentro 3: Representación de texto y selección de modelos**.
 
-| Uso | Hex |
-|---|---|
-| Fondo oscuro | `#06141B` |
-| Panel principal | `#11212D` |
-| Superficies | `#253745` |
-| Bordes y barras secundarias | `#4A5C6A` |
-| Texto secundario | `#9BA8AB` |
-| Texto principal y barras activas | `#CCD0CF` |
+El usuario introduce **una sola frase** y obtiene:
 
-El usuario escribe una frase y obtiene la **predicción 1–5 estrellas**, la distribución completa de puntuaciones, tokens reales con sus IDs, un análisis adicional con spaCy y una explicación educativa del proceso.
+1. La etiqueta de sentimiento (1 a 5 estrellas) y su puntuación.
+2. **Un gráfico con las puntuaciones de las cinco estrellas** y una tabla numérica.
+3. Los **tokens reales e IDs** del tokenizador del clasificador.
+4. Una comparación opcional de la tokenización de spaCy.
+5. Una explicación integrada de **tokenización vs. predicción**, paso por paso.
 
-## ¿Qué archivo hace qué?
+> El modelo `nlptown/bert-base-multilingual-uncased-sentiment` fue ajustado con reseñas de productos. Sus puntuaciones son las salidas de la clasificación entre estrellas; **no son precisión o certeza calibrada**. El modelo no clasifica motivos de solicitudes de estudiantes.
 
-- `app.py`: interfaz de Streamlit, formularios y componentes de resultados.
-- `styles.css`: diseño responsivo. Modifica aquí sombras, espaciados, colores y tamaños.
-- `ui_components.py`: tarjetas de métricas, barras HTML y fichas de tokens.
-- `nlp_core.py`: tokenización, análisis con spaCy e inferencia con Hugging Face.
-- `.streamlit/config.toml`: tema oscuro nativo de Streamlit y los seis colores.
-- `requirements.txt`: dependencias de la app y modelo spaCy.
-- `NLP_Lab.ipynb`: notebook didáctico de referencia para Google Colab.
-- `tests/`: pruebas de procesamiento de texto y de componentes visuales.
+## Relación con el notebook
 
-## Publicación en Streamlit Community Cloud
+| Notebook | Archivo de la aplicación | Función |
+|---|---|---|
+| Celdas 8–9 · spaCy | `nlp_core.py` | Tokens, lemas, stop words y puntuación |
+| Celdas 20–22 · BETO | Excluido | Experimento aparte, otro tokenizador |
+| Celda 28 · Hugging Face | `app.py`, `nlp_core.py` | Carga y predicción con el modelo de sentimiento |
+| Celda 31 · `cadena()` | `nlp_core.py` | Integración de análisis y predicción |
 
-1. Descomprime el ZIP y sube **todos los archivos y carpetas** a la raíz de tu repositorio GitHub (sin incluir una carpeta contenedora adicional).
-2. En [Streamlit Community Cloud](https://share.streamlit.io/), crea una app desde ese repositorio.
-3. Selecciona `main` como rama y `app.py` como *Main file path*.
-4. En opciones avanzadas selecciona **Python 3.12**.
-5. Publica la app; el primer análisis descargará y cargará el modelo de sentimientos.
+Para obtener las cinco puntuaciones, ahora se utiliza `top_k=None` en la llamada al clasificador. Solo se muestra la predicción de mayor puntuación como etiqueta ganadora.
 
-No se requiere HTML externo, JavaScript ni servicio API. La interfaz se construye con Streamlit y CSS local.
+## Estructura del repositorio
 
-## Pruebas
+```text
+nlp-lab-streamlit/
+├── app.py
+├── nlp_core.py
+├── requirements.txt
+├── README.md
+├── tests/
+│   └── test_nlp_core.py
+├── .gitignore
+└── .streamlit/
+    └── config.toml
+```
 
-Sin descargar los modelos de Hugging Face puedes verificar la lógica con:
+## Publicar en Streamlit Community Cloud
+
+1. Sube el contenido de la carpeta (no el ZIP) a la **raíz** del repositorio GitHub.
+2. Abre <https://share.streamlit.io/> y vincula el repositorio.
+3. Selecciona la rama `main`, archivo principal `app.py` y Python **3.12** en *Advanced settings*.
+4. Publica la aplicación. `requirements.txt` define la versión de Streamlit y el resto de bibliotecas.
+5. La primera consulta descarga el modelo de Hugging Face (requiere acceso a Internet); pueden darse límites de memoria o problemas de conexión en la instancia.
+
+## Verificar la lógica (sin descargar modelos)
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-Estas pruebas no sustituyen un despliegue real en Community Cloud. Si el servidor gratuito agota la RAM o no puede descargar un modelo, revisa los logs del despliegue.
-
-## Limitación importante
-
-El modelo `nlptown/bert-base-multilingual-uncased-sentiment` fue entrenado para reseñas de productos y devuelve una etiqueta de **1 a 5 estrellas**. No está ajustado específicamente para evaluar experiencias educativas. Sus puntuaciones internas **no son estimaciones calibradas de exactitud o certeza**.
+Las pruebas utilizan sustitutos del modelo real para comprobar los resultados, las cinco puntuaciones, el truncamiento y la conservación de negaciones. **No sustituyen una prueba completa en Streamlit Community Cloud.**
